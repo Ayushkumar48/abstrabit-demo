@@ -6,22 +6,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import LoginButton from "./login-button";
-import { Button } from "./ui/button";
 import { Bookmark, LogOut, User as UserIcon } from "lucide-react";
 
-export default function Navbar() {
-  const [user, setUser] = useState<User | null>(null);
+export default function Navbar({ initialUser }: { initialUser: User | null }) {
+  const [user, setUser] = useState<User | null>(initialUser);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   useEffect(() => {
-    const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
@@ -43,10 +34,7 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-lg border-b border-border z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link
-            href={user ? "/dashboard" : "/"}
-            className="flex items-center gap-2 shrink-0 group"
-          >
+          <Link href="/" className="flex items-center gap-2 shrink-0 group">
             <div className="size-8 rounded-lg bg-primary flex items-center justify-center group-hover:scale-110 transition-transform">
               <Bookmark className="size-5 text-primary-foreground" />
             </div>

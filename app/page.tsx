@@ -1,21 +1,21 @@
-import { supabase } from "@/lib/supabase/client";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Bookmark, Zap, Shield, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import LoginButton from "@/components/login-button";
 
 export default async function HomePage() {
-  const { data } = await supabase.auth.getUser();
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
 
-  if (data.user) {
-    redirect("/dashboard");
-  }
-
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return (
     <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
+      <section className="relative overflow-hidden bg-linear-to-br from-primary/5 via-background to-accent/5">
+        <div className="absolute inset-0 bg-grid-slate-100 mask-[linear-gradient(0deg,white,rgba(255,255,255,0.6))] -z-10" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
           <div className="text-center space-y-8">
             <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium">
@@ -36,11 +36,15 @@ export default async function HomePage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-4">
-              <Link href="/dashboard">
-                <Button size="lg" className="text-base px-8 h-12">
-                  Get Started Free
-                </Button>
-              </Link>
+              {session?.user ? (
+                <Link href="/dashboard">
+                  <Button size="lg" className="text-base px-8 h-12">
+                    Get Started Free
+                  </Button>
+                </Link>
+              ) : (
+                <LoginButton />
+              )}
               <a href="#features">
                 <Button
                   variant="outline"
@@ -128,7 +132,7 @@ export default async function HomePage() {
       {/* CTA Section */}
       <section className="py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-gradient-to-br from-primary to-accent rounded-3xl p-12 text-center shadow-xl">
+          <div className="bg-linear-to-br from-primary to-accent rounded-3xl p-12 text-center shadow-xl">
             <h2 className="text-3xl sm:text-4xl font-bold text-primary-foreground mb-4">
               Ready to Get Started?
             </h2>

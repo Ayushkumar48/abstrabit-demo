@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Roboto } from "next/font/google";
+import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
@@ -21,17 +23,24 @@ export const metadata: Metadata = {
     "Save, organize, and access your favorite links from anywhere. Real-time sync across all your devices with enterprise-grade security.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const supabase = createClient(cookieStore);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <html lang="en" className={roboto.variable}>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased pt-16`}
       >
-        <Navbar />
+        <Navbar initialUser={user} />
         {children}
       </body>
     </html>

@@ -43,22 +43,8 @@ export default async function DashboardPage() {
             Manage and organize your saved links
           </p>
         </div>
-
         <BookmarkForm userId={user.id} />
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-foreground">
-              Your Bookmarks
-            </h2>
-            <span className="text-sm text-muted-foreground">
-              {bookmarks.length}{" "}
-              {bookmarks.length === 1 ? "bookmark" : "bookmarks"}
-            </span>
-          </div>
-
-          <BookmarkList initialBookmarks={bookmarks} userId={user.id} />
-        </div>
+        <BookmarkList initialBookmarks={bookmarks} userId={user.id} />
       </div>
     </div>
   );
