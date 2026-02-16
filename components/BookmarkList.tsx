@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ interface BookmarkType {
 interface BookmarkListProps {
   initialBookmarks: BookmarkType[];
   userId: string;
+  onConnectionStatusChange: (
+    status: "connecting" | "connected" | "disconnected",
+  ) => void;
 }
 
 const formatDate = (date: string | null) => {
@@ -45,9 +48,58 @@ const pluralizeBookmarks = (count: number) => {
   return `${count} bookmark${count !== 1 ? "s" : ""}`;
 };
 
+interface BookmarkCardProps {
+  bookmark: BookmarkType;
+  onDelete: (id: string) => void;
+}
+
+const BookmarkCard = ({ bookmark, onDelete }: BookmarkCardProps) => {
+  return (
+    <Card key={bookmark.id} className="group hover:shadow-md transition-shadow">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start gap-3">
+              <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Bookmark className="size-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-foreground mb-1 truncate">
+                  {bookmark.title}
+                </h3>
+                <a
+                  href={bookmark.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
+                >
+                  <span className="truncate">{bookmark.url}</span>
+                  <ExternalLink className="size-3 shrink-0" />
+                </a>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Added {formatDate(bookmark.created_at)}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => onDelete(bookmark.id)}
+            className="text-muted-foreground hover:text-destructive shrink-0"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function BookmarkList({
   initialBookmarks,
   userId,
+  onConnectionStatusChange,
 }: BookmarkListProps) {
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>(initialBookmarks);
   const [connectionStatus, setConnectionStatus] = useState<
@@ -55,6 +107,11 @@ export default function BookmarkList({
   >("connecting");
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const router = useRouter();
+
+  const bookmarkCountText = useMemo(
+    () => pluralizeBookmarks(bookmarks.length),
+    [bookmarks.length],
+  );
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event) => {
@@ -69,6 +126,8 @@ export default function BookmarkList({
   }, [router]);
 
   useEffect(() => {
+    onConnectionStatusChange("connecting");
+
     let cancelled = false;
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -119,13 +178,14 @@ export default function BookmarkList({
         .subscribe((status) => {
           if (status === "SUBSCRIBED") {
             setConnectionStatus("connected");
+            onConnectionStatusChange("connected");
           } else if (
             status === "CHANNEL_ERROR" ||
             status === "TIMED_OUT" ||
             status === "CLOSED"
           ) {
-            console.error("❌ Realtime disconnected:", status);
             setConnectionStatus("disconnected");
+            onConnectionStatusChange("disconnected");
           }
         });
     }
@@ -139,9 +199,9 @@ export default function BookmarkList({
       }
       broadcastChannelRef.current?.close();
     };
-  }, [userId]);
+  }, [userId, onConnectionStatusChange]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
       const { error } = await supabase
         .from("bookmarks")
@@ -150,17 +210,14 @@ export default function BookmarkList({
         .select();
 
       if (error) {
-        console.error("❌ Error deleting bookmark:", error);
         alert(`Failed to delete: ${error.message}`);
       } else {
         setBookmarks((prev) => prev.filter((b) => b.id !== id));
 
         broadcastChannelRef.current?.postMessage({ type: "DELETE", id });
       }
-    } catch (err) {
-      console.error("❌ Delete error:", err);
-    }
-  };
+    } catch {}
+  }, []);
 
   return (
     <>
@@ -169,7 +226,7 @@ export default function BookmarkList({
           Your Bookmarks
         </h2>
         <span className="text-sm text-muted-foreground">
-          {pluralizeBookmarks(bookmarks.length)}
+          {bookmarkCountText}
         </span>
       </div>
 
@@ -210,47 +267,11 @@ export default function BookmarkList({
       ) : (
         <div className="grid gap-4">
           {bookmarks.map((bookmark) => (
-            <Card
+            <BookmarkCard
               key={bookmark.id}
-              className="group hover:shadow-md transition-shadow"
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-3">
-                      <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                        <Bookmark className="size-5 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-foreground mb-1 truncate">
-                          {bookmark.title}
-                        </h3>
-                        <a
-                          href={bookmark.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline flex items-center gap-1 truncate"
-                        >
-                          <span className="truncate">{bookmark.url}</span>
-                          <ExternalLink className="size-3 shrink-0" />
-                        </a>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Added {formatDate(bookmark.created_at)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => handleDelete(bookmark.id)}
-                    className="text-muted-foreground hover:text-destructive shrink-0"
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              bookmark={bookmark}
+              onDelete={handleDelete}
+            />
           ))}
         </div>
       )}

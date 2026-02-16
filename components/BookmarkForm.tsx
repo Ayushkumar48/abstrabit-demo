@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,54 +12,74 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Loader2, AlertCircle } from "lucide-react";
+import { Plus, Loader, AlertCircle } from "lucide-react";
 
 interface BookmarkFormProps {
   userId: string;
+  isRealtimeConnected: boolean;
 }
 
-export default function BookmarkForm({ userId }: BookmarkFormProps) {
+const validateUrl = (url: string): boolean => {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export default function BookmarkForm({
+  userId,
+  isRealtimeConnected,
+}: BookmarkFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
+  const handleSubmit = useCallback(
+    async (e: React.SyntheticEvent<HTMLFormElement>) => {
+      e.preventDefault();
 
-    const formData = new FormData(e.currentTarget);
-    const title = formData.get("title") as string;
-    const url = formData.get("url") as string;
+      if (!isRealtimeConnected) {
+        setError("Please wait for real-time connection to be established");
+        return;
+      }
 
-    if (!title?.trim() || !url?.trim()) {
-      setError("Title and URL are required");
+      setError("");
+      setIsSubmitting(true);
+
+      const formData = new FormData(e.currentTarget);
+      const title = formData.get("title") as string;
+      const url = formData.get("url") as string;
+
+      if (!title?.trim() || !url?.trim()) {
+        setError("Title and URL are required");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!validateUrl(url)) {
+        setError("Please enter a valid URL");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("bookmarks").insert({
+        user_id: userId,
+        title: title.trim(),
+        url: url.trim(),
+      });
+
+      if (insertError) {
+        setError(insertError.message);
+      } else {
+        formRef.current?.reset();
+      }
+
       setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      new URL(url);
-    } catch {
-      setError("Please enter a valid URL");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("bookmarks").insert({
-      user_id: userId,
-      title: title.trim(),
-      url: url.trim(),
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-    } else {
-      formRef.current?.reset();
-    }
-
-    setIsSubmitting(false);
-  };
+    },
+    [userId, isRealtimeConnected],
+  );
 
   return (
     <Card className="mb-8">
@@ -107,13 +127,18 @@ export default function BookmarkForm({ userId }: BookmarkFormProps) {
 
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !isRealtimeConnected}
             className="w-full sm:w-auto"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="size-4 animate-spin" />
+                <Loader className="size-4 animate-spin" />
                 Adding...
+              </>
+            ) : !isRealtimeConnected ? (
+              <>
+                <Plus className="size-4" />
+                Connecting...
               </>
             ) : (
               <>

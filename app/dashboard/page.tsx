@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getBookmarks } from "@/app/actions/bookrmarks";
-import BookmarkForm from "@/components/BookmarkForm";
-import BookmarkList from "@/components/BookmarkList";
+import DashboardClient from "@/components/DashboardClient";
 
 export default async function DashboardPage() {
   const cookieStore = await cookies();
@@ -43,8 +42,8 @@ export default async function DashboardPage() {
             Manage and organize your saved links
           </p>
         </div>
-        <BookmarkForm userId={user.id} />
-        <BookmarkList initialBookmarks={bookmarks} userId={user.id} />
+
+        <DashboardClient userId={user.id} initialBookmarks={bookmarks} />
       </div>
     </div>
   );
