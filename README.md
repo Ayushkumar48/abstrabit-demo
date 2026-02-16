@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Smart Bookmark App
 
-## Getting Started
+A bookmark manager I built with Next.js and Supabase. It syncs bookmarks in real-time across tabs and devices using Supabase's realtime feature.
 
-First, run the development server:
+## What it does
 
+- Google sign-in for auth
+- Save and delete bookmarks
+- Real-time sync — changes show up instantly in all open tabs
+- Clean UI with Tailwind and shadcn/ui
+
+## Stack
+
+- Next.js 16 + React 19 + TypeScript
+- Supabase for database, auth, and realtime
+- Tailwind CSS + shadcn/ui
+
+## Setup
+
+You'll need Node.js 20+ and a Supabase project.
+
+1. Clone and install deps:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
+git clone <repo-url>
+cd abstrabit-demo
+bun install
+```
+
+2. Create a `.env.local` file with your Supabase creds:
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+```
+
+3. Run the RLS policies on your Supabase database:
+```bash
+psql -h your-db-host -U postgres -d postgres -f supabase-rls-policies.sql
+```
+
+4. Start it up:
+```bash
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Database
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Just one table:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```sql
+CREATE TABLE bookmarks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
 
-## Learn More
+## Realtime issue I ran into
 
-To learn more about Next.js, take a look at the following resources:
+This one took me a while to figure out. When I navigated from the homepage to `/dashboard` using Next.js client-side routing, the realtime connection would fail and show "Disconnected." But if I refreshed the page, it worked fine.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Turns out the Supabase browser client initializes auth from cookies asynchronously. My code was trying to subscribe to a realtime channel before auth was actually ready, so the subscription would just fail silently with `CHANNEL_ERROR` or `TIMED_OUT`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The fix was straightforward — I just added `await supabase.auth.getSession()` before setting up the realtime subscription. That gives the client time to load the auth state from cookies before attempting to connect.
 
-## Deploy on Vercel
+On top of that, I lifted the connection status into a shared parent component so the bookmark form stays disabled until realtime is actually connected. That way you can't submit a bookmark while the connection is still being established.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+bun run build
+bun run start
+```
