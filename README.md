@@ -56,15 +56,19 @@ CREATE TABLE bookmarks (
 );
 ```
 
-## Realtime issue I ran into
+## Setting up Supabase Realtime — what I learned
 
-This one took me a while to figure out. When I navigated from the homepage to `/dashboard` using Next.js client-side routing, the realtime connection would fail and show "Disconnected." But if I refreshed the page, it worked fine.
+Supabase realtime was completely new to me going into this project. The docs make it look simple — just call `.channel()` and `.subscribe()` — but getting it to work properly with Next.js had a few gotchas that took me a while to work through.
 
-Turns out the Supabase browser client initializes auth from cookies asynchronously. My code was trying to subscribe to a realtime channel before auth was actually ready, so the subscription would just fail silently with `CHANNEL_ERROR` or `TIMED_OUT`.
+First, you need to enable realtime on your table in the Supabase dashboard (Database → Replication). I missed this initially and spent a while wondering why nothing was happening.
 
-The fix was straightforward — I just added `await supabase.auth.getSession()` before setting up the realtime subscription. That gives the client time to load the auth state from cookies before attempting to connect.
+Then there's the RLS side of things. Your realtime subscriptions respect row-level security, so you need proper policies in place or you just get empty payloads. The `supabase-rls-policies.sql` file in this repo has the policies I ended up with.
 
-On top of that, I lifted the connection status into a shared parent component so the bookmark form stays disabled until realtime is actually connected. That way you can't submit a bookmark while the connection is still being established.
+The trickiest bug was with client-side navigation. Going from the homepage to `/dashboard` would show "Disconnected", but a page refresh would connect just fine. After a lot of debugging, I figured out that the Supabase browser client loads auth state from cookies asynchronously. My subscription was firing before auth was ready, so it would just fail with `CHANNEL_ERROR` or `TIMED_OUT`. The fix was adding `await supabase.auth.getSession()` before subscribing — that waits for auth to be loaded first.
+
+I also had to think about cross-tab behavior. If you log out in one tab, the other tab with the dashboard should kick you out too. I added an `onAuthStateChange` listener for that. And for the bookmark form, I lifted the connection status up so the form stays disabled until realtime is actually connected — no point letting someone submit if the sync isn't ready.
+
+Overall it wasn't too bad once I understood the pieces, but the auth + realtime interaction in a Next.js app with SSR and client-side navigation definitely has some sharp edges that aren't obvious from the docs alone.
 
 ## Deploy
 
