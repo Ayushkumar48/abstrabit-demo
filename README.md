@@ -21,7 +21,7 @@ You'll need Node.js 20+ and a Supabase project.
 
 1. Clone and install deps:
 ```bash
-git clone <repo-url>
+git clone git@github.com:Ayushkumar48/abstrabit-demo.git
 cd abstrabit-demo
 bun install
 ```
